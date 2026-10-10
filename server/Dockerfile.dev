@@ -15,8 +15,9 @@ RUN useradd --uid 1000 --create-home app && chown app /app
 USER app
 
 # Dependencies first so this layer is cached until pyproject.toml / uv.lock change.
-COPY --chown=app:app pyproject.toml uv.lock ./
-RUN uv sync --locked --no-install-project
+# uv.lock* is a glob so the build still works before a lockfile exists (uv creates one).
+COPY --chown=app:app pyproject.toml uv.lock* ./
+RUN uv sync --no-install-project
 
 EXPOSE 8000
-CMD ["uv", "run", "--locked", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
