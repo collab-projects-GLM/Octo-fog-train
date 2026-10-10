@@ -1,42 +1,20 @@
-# Local dev stack: Expo dev server + Django API + Postgres + S3-compatible storage (RustFS).
+# Local dev stack: Django API + Postgres + S3-compatible storage (RustFS).
+# The Expo app is not containerised, run it on the host (cd app && bun start).
 #
 #   docker compose up --build
 #
-#   Expo (Metro / web)  http://localhost:8081
 #   API                 http://127.0.0.1:8000   (runserver, reloads on save)
 #   Postgres            127.0.0.1:5433
 #   S3 API / console    http://127.0.0.1:9000 / http://127.0.0.1:9001
 #
-# Physical device on the same Wi-Fi: Metro runs inside a container, so it can't see the
-# host's LAN IP. Tell it, or the QR code points at the container's internal address:
-#   EXPO_HOST_IP=192.168.x.x docker compose up
-#
-# Dependencies: bun (app) and uv (api). Both re-sync on every start, following bun.lock / uv.lock.
-# A missing lockfile is created (and a stale one updated) in ./app or ./server, so commit it.
+# Dependencies: uv (api). Re-synced on every start, following uv.lock.
+# A missing lockfile is created (and a stale one updated) in ./server, so commit it.
 #
 # server/compose.yml is the infra-only setup (db + storage + gunicorn API) and is unchanged.
 # Don't run both at once, they publish the same ports.
 name: octo-travel
 
 services:
-  app:
-    build:
-      context: ./app
-      dockerfile: Dockerfile.dev
-    # Install on start so a package.json change doesn't need an image rebuild.
-    command: sh -c "bun install && exec bun --bun run start --port 8081"
-    environment:
-      EXPO_NO_TELEMETRY: "1"
-      REACT_NATIVE_PACKAGER_HOSTNAME: ${EXPO_HOST_IP:-localhost}
-    ports:
-      # Not bound to 127.0.0.1: phones and emulators have to reach Metro over the LAN.
-      # Must stay 8081:8081, Metro advertises its internal port in the QR code.
-      - "8081:8081"
-    volumes:
-      - ./app:/app
-      # Keep the container's node_modules; the host's would shadow it.
-      - /app/node_modules
-
   api:
     build:
       context: ./server
