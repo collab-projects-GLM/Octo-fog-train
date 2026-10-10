@@ -1,0 +1,119 @@
+# Local dev stack: Expo dev server + Django API + Postgres + S3-compatible storage (RustFS).
+#
+#   docker compose up --build
+#
+#   Expo (Metro / web)  http://localhost:8081
+#   API                 http://127.0.0.1:8000   (runserver, reloads on save)
+#   Postgres            127.0.0.1:5433
+#   S3 API / console    http://127.0.0.1:9000 / http://127.0.0.1:9001
+#
+# Physical device on the same Wi-Fi: Metro runs inside a container, so it can't see the
+# host's LAN IP. Tell it, or the QR code points at the container's internal address:
+#   EXPO_HOST_IP=192.168.x.x docker compose up
+#
+# Dependencies: bun (app) and uv (api). Both re-sync from bun.lock / uv.lock on every start.
+#
+# server/compose.yml is the infra-only setup (db + storage + gunicorn API) and is unchanged.
+# Don't run both at once, they publish the same ports.
+name: octo-travel
+
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.dev
+    # Install on start so a package.json change doesn't need an image rebuild.
+    command: sh -c "bun install --frozen-lockfile && exec bun --bun run start --port 8081"
+    environment:
+      EXPO_NO_TELEMETRY: "1"
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${EXPO_HOST_IP:-localhost}
+    ports:
+      # Not bound to 127.0.0.1: phones and emulators have to reach Metro over the LAN.
+      # Must stay 8081:8081, Metro advertises its internal port in the QR code.
+      - "8081:8081"
+    volumes:
+      - ./app:/app
+      # Keep the container's node_modules; the host's would shadow it.
+      - /app/node_modules
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    # Sync on start so a pyproject.toml / uv.lock change doesn't need an image rebuild.
+    command: sh -c "uv run --locked python manage.py migrate --noinput && exec uv run --locked python manage.py runserver 0.0.0.0:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      createbucket:
+        condition: service_completed_successfully
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-dev-secret-key-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-octo_travel}
+      POSTGRES_USER: ${POSTGRES_USER:-octo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-octo_dev_password}
+      # Inside the compose network the services are reached by name, not 127.0.0.1.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-s3}
+      S3_ENDPOINT_URL: http://rustfs:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-octo-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+      S3_BUCKET: ${S3_BUCKET:-octo-travel}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ./server:/app
+      # Keep the container's .venv; the host's (different python/paths) would shadow it.
+      - /app/.venv
+
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-octo_travel}
+      POSTGRES_USER: ${POSTGRES_USER:-octo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-octo_dev_password}
+    ports:
+      # 5433 on the host because a local Postgres usually owns 5432.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-octo-local}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+    ports:
+      - "127.0.0.1:${S3_PORT:-9000}:9000"
+      - "127.0.0.1:${S3_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - rustfs_data:/data
+
+  # One-shot: creates the bucket if missing, then exits.
+  createbucket:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - rustfs
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-octo-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-octo-travel}
+    entrypoint: >
+      /bin/sh -c "
+      until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do sleep 1; done;
+      aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket $${S3_BUCKET} 2>/dev/null
+      || aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket $${S3_BUCKET}
+      "
+
+volumes:
+  postgres_data:
+  rustfs_data:

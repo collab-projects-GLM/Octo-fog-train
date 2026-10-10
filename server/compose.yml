@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:18
+    container_name: octo-travel-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-octo_travel}
+      POSTGRES_USER: ${POSTGRES_USER:-octo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-octo_dev_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: octo-travel-storage
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-octo-local}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - rustfs_data:/data
+
+  # One-shot: creates the bucket if missing, then exits.
+  createbucket:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - rustfs
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-octo-local}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-octo-travel}
+    entrypoint: >
+      /bin/sh -c "
+      until aws --endpoint-url http://rustfs:9000 s3api list-buckets >/dev/null 2>&1; do sleep 1; done;
+      aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket $${S3_BUCKET} 2>/dev/null
+      || aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket $${S3_BUCKET}
+      "
+
+  api:
+    build: .
+    container_name: octo-travel-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      createbucket:
+        condition: service_completed_successfully
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-insecure-dev-secret-key-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-octo_travel}
+      POSTGRES_USER: ${POSTGRES_USER:-octo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-octo_dev_password}
+      # Inside the compose network the services are reached by name, not 127.0.0.1.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-s3}
+      S3_ENDPOINT_URL: http://rustfs:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-octo-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-local-dev-secret-change-me}
+      S3_BUCKET: ${S3_BUCKET:-octo-travel}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+volumes:
+  postgres_data:
+  rustfs_data:
