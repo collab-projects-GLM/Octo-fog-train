@@ -1,5 +1,5 @@
 import { View } from "react-native";
 
-export function SettingSection() {
+export default function SettingSection() {
   return <View></View>;
 }

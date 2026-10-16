@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 from django.http import Http404
 from django.test import SimpleTestCase
@@ -8,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import AccessToken
 
 from config.exceptions import UsernameTakenError
 
@@ -77,8 +79,8 @@ class AuthRequiredView(APIView):
 factory = APIRequestFactory()
 
 
-def call(view, method="get", path="/", data=None):
-    request = getattr(factory, method)(path, data, format="json")
+def call(view, method="get", path="/", data=None, **extra):
+    request = getattr(factory, method)(path, data, format="json", **extra)
     response = view.as_view()(request)
     response.render()
     response.json = lambda: json.loads(response.content)
@@ -157,6 +159,28 @@ class ErrorEnvelopeTests(SimpleTestCase):
         response = call(AuthRequiredView)  # default IsAuthenticated, no credentials
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["error"]["code"], "NOT_AUTHENTICATED")
+
+    def assert_token_not_valid(self, response):
+        self.assertEqual(response.status_code, 401)
+        error = response.json()["error"]
+        # SimpleJWT's InvalidToken has a dict detail; code and message must stay plain strings.
+        self.assertEqual(error["code"], "TOKEN_NOT_VALID")
+        self.assertNotIn("{", error["message"])
+        self.assertEqual(error["details"], [])
+
+    def test_invalid_token_has_a_stable_code(self):
+        response = call(AuthRequiredView, HTTP_AUTHORIZATION="Bearer not-a-real-token")
+        self.assert_token_not_valid(response)
+
+    def test_expired_token_has_a_stable_code(self):
+        token = AccessToken()
+        token.set_exp(
+            from_time=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            lifetime=timedelta(minutes=5),
+        )
+
+        response = call(AuthRequiredView, HTTP_AUTHORIZATION=f"Bearer {token}")
+        self.assert_token_not_valid(response)
 
     def test_unhandled_exception_hides_internals(self):
         with self.assertLogs("config.exception_handlers", level="ERROR"):

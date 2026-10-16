@@ -28,7 +28,8 @@ The envelope shape is defined in the root `CLAUDE.md`. Route every server call t
 - `ApiError` (`src/api/error.ts`) carries `code`, `message`, `details` and `httpStatus`. Branch on `code`, and map `details[].field` onto form fields.
 - `NETWORK_ERROR` (`httpStatus` 0, request never reached the server) is the only code synthesized client-side. The client trusts the body to be an envelope and does not validate it.
 - A request cancelled through its `signal` rethrows the original abort error, not an `ApiError`.
-- Paths need Django's trailing slash (`/api/auth/login/`). Auth headers are passed per call via `headers`; there is no token injection yet.
+- Paths need Django's trailing slash (`/api/auth/login/`). Paths live in `src/lib/api-routes.ts`. Auth headers are passed per call via `headers`; the client does not inject the access token itself.
+- **401 handling.** A 401 from any non-auth path triggers one refresh (`POST /api/auth/token/refresh/` with the refresh token from `expo-secure-store`), saves the rotated `{access, refresh}` pair, and retries the request once with `Authorization: Bearer <new access>`. Concurrent 401s share one refresh, because a rotated refresh token is single-use. If the refresh fails (or no refresh token is stored) it only `console.log`s for now and rethrows the original 401 `ApiError`. Login, register, logout and refresh are never refreshed on 401, so their errors stay real answers. Secure-store keys are in `src/lib/secure-store.ts`.
 - Envelope types are in `src/types/error.type.ts`.
 
 ## Architecture

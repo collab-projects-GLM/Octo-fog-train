@@ -1,5 +1,5 @@
 import { View } from "react-native";
 
-export function RelicSection() {
+export default function RelicSection() {
   return <View></View>;
 }

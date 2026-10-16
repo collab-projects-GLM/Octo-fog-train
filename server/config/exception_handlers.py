@@ -53,6 +53,18 @@ def _error_response(response: Response, code: str, message: str, details: list[E
     return response
 
 
+def _code_and_message(exc: exceptions.APIException) -> tuple[str, str]:
+    codes, detail = exc.get_codes(), exc.detail
+
+    if isinstance(detail, dict):
+        # SimpleJWT's InvalidToken carries {"detail", "code", "messages"} instead
+        # of a string; stringifying the whole dict would leak into `code`.
+        codes = codes.get("detail", exc.default_code)
+        detail = detail.get("detail", exc.default_detail)
+
+    return str(codes).upper(), str(detail)
+
+
 def custom_exception_handler(exc, context):
     # Same conversions DRF applies internally, done up front so every
     # exception we format below is an APIException.
@@ -81,9 +93,5 @@ def custom_exception_handler(exc, context):
             details=_flatten(exc.detail),
         )
 
-    return _error_response(
-        response,
-        code=str(exc.get_codes()).upper(),
-        message=str(exc.detail),
-        details=[],
-    )
+    code, message = _code_and_message(exc)
+    return _error_response(response, code=code, message=message, details=[])
