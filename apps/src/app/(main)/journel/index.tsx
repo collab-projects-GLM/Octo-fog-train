@@ -1,5 +1,5 @@
 import { View } from "react-native";
 
-export function JournelSection() {
+export default function JournelSection() {
   return <View></View>;
 }

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
     'drf_spectacular',
     'corsheaders',
@@ -171,6 +172,31 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "config.exception_handlers.custom_exception_handler",
+    # Baseline for every DRF view. The auth endpoints override it with a
+    # stricter scoped throttle (see authentication/views.py).
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    # Throttle counters live in Django's cache, which defaults to a per-process
+    # LocMemCache. Point CACHES at a shared backend (Redis, DatabaseCache)
+    # before running more than one worker, or each worker counts separately.
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/min",
+        "user": "300/min",
+        "login": "5/min",
+        "register": "10/hour",
+        "token_refresh": "30/min",
+        "logout": "30/min",
+    },
+}
+
+# Refresh tokens rotate on every use and the spent one is blacklisted, so a
+# stolen refresh token stops working as soon as the real client refreshes.
+# Access (5 min) and refresh (1 day) lifetimes stay at SimpleJWT's defaults.
+SIMPLE_JWT = {
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 SPECTACULAR_SETTINGS = {

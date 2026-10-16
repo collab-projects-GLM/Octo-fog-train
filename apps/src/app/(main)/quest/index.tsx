@@ -1,5 +1,5 @@
 import { View } from "react-native";
 
-export function QuestSection() {
+export default function QuestSection() {
   return <View></View>;
 }

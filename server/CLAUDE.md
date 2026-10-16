@@ -19,14 +19,14 @@ uv run manage.py test config                             # envelope tests only (
 uv run manage.py test config.tests.ErrorEnvelopeTests.test_app_exception_uses_its_own_code_and_message   # single test
 ```
 
-Tests in `config/` use `SimpleTestCase` and run without Postgres. Tests in `authentication/` hit the DB and need the compose Postgres up (Django creates and drops its own test database).
+Tests in `config/` use `SimpleTestCase` and run without Postgres. Tests in `authentication/` hit the DB and need the compose Postgres up (Django creates and drops its own test database). After pulling auth changes, run `uv run manage.py migrate` so the dev database gets the `token_blacklist` tables.
 
 ## API response contract
 
 The envelope shape is defined in the root `CLAUDE.md`. Two pieces enforce it, wired in `REST_FRAMEWORK` in `config/settings.py`:
 
 - `config/renderers.py` `EnvelopeJSONRenderer` (the default renderer) wraps successes. It passes 4xx/5xx through untouched.
-- `config/exception_handlers.py` `custom_exception_handler` shapes every error. `ValidationError` becomes `VALIDATION_ERROR` with `details` flattened to `{field, message, code}`. Any other exception gets its own `get_codes()` uppercased as `code`, `str(detail)` as `message`, and `details: []`. Django `Http404`/`PermissionDenied` are converted first. Unhandled exceptions are logged and returned as a generic `INTERNAL_ERROR` 500 with no internals leaked.
+- `config/exception_handlers.py` `custom_exception_handler` shapes every error. `ValidationError` becomes `VALIDATION_ERROR` with `details` flattened to `{field, message, code}`. Any other exception gets its own `get_codes()` uppercased as `code`, `str(detail)` as `message`, and `details: []`; a dict `detail` (SimpleJWT's `InvalidToken`) is unwrapped to its `detail` entry first, so a bad or expired token is `TOKEN_NOT_VALID`, not a stringified dict. Django `Http404`/`PermissionDenied` are converted first. Unhandled exceptions are logged and returned as a generic `INTERNAL_ERROR` 500 with no internals leaked.
 - Types for both shapes live in `config/error.py`.
 
 Rules when writing endpoints:
@@ -40,6 +40,13 @@ Rules when writing endpoints:
 ## Architecture
 
 - `config/` — project settings, URL root, and the cross-cutting API plumbing above (renderer, exception handler, exception classes, types).
-- `authentication/` — custom user model (`AUTH_USER_MODEL = "authentication.User"`), register view, and SimpleJWT login/refresh under `/api/auth/`. JWT is the only default authentication class.
+- `authentication/` — custom user model (`AUTH_USER_MODEL = "authentication.User"`), and `register/`, `login/`, `logout/`, `token/refresh/` under `/api/auth/`. JWT is the only default authentication class, so there are no cookies and no CSRF surface on the API (CSRF middleware still covers `/admin/`). If you ever add `SessionAuthentication` or cookie tokens, CSRF needs handling.
+
+## Auth: tokens, throttling, passwords
+
+- **Tokens.** Access lives 5 min, refresh 1 day (SimpleJWT defaults). `token_blacklist` is installed and refresh tokens rotate: `/token/refresh/` returns a new `{access, refresh}` and blacklists the old refresh, so the client must store the new one. `POST /api/auth/logout/` with `{refresh}` blacklists it (no auth header; holding the token is the credential). Access tokens are stateless and stay valid until they expire (max 5 min) after logout. Needs `uv run manage.py migrate` for the blacklist tables (and `authentication.0002` for the uniqueness constraints below).
+- **Throttling.** `REST_FRAMEWORK` sets a baseline (`anon`/`user`) and each auth view overrides it with `ScopedRateThrottle` (`login`, `register`, `token_refresh`, `logout`; rates in `DEFAULT_THROTTLE_RATES`). Rejections are 429 `THROTTLED` with `Retry-After`. Counters live in Django's cache, which is a per-process `LocMemCache` by default: point `CACHES` at a shared backend before running more than one worker. Limits are per IP; set `NUM_PROXIES` behind a proxy. Tests must `cache.clear()` in `setUp` (see `AuthTestCase`) and patch `SimpleRateThrottle.THROTTLE_RATES` to test a limit.
+- **Uniqueness.** Usernames are unique ignoring case and so is email (blank emails excluded, so users may have none). Both are enforced twice: DB `UniqueConstraint(Lower(...))` constraints on `User`, and iexact `UniqueValidator`s in `RegisterSerializer` that return a 400 on the field with code `UNIQUE`. Login is case-insensitive too, via `CaseInsensitiveUserManager.get_by_natural_key`. A request that loses a race past the serializer check hits the constraint and surfaces as a 500. Keep any new user-creating path (admin, scripts) going through `User.objects.create_user`.
+- **Passwords.** `RegisterSerializer.validate` runs `AUTH_PASSWORD_VALIDATORS` and reports failures on `password` with Django's codes (`PASSWORD_TOO_COMMON`, ...). It is object-level, so it only runs once the individual fields are valid.
 - `api/` — only the health check at `/api/v1/health/`.
 - Admin is skinned with Jazzmin and lives at `/admin/`.
