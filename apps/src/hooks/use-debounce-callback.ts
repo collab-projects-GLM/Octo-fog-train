@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from "react";
 
 /**
  * @abstract A debounce function
+ * @author Ayush Pradhan
+ * @description Dont worry about this
  */
 export function useDebouncedCallback<Args extends unknown[]>(
   callback: (...args: Args) => void,
