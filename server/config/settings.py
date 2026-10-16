@@ -19,15 +19,23 @@ ALLOWED_HOSTS = [
 
 # Application definition
 INSTALLED_APPS = [
+    'jazzmin',
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'rest_framework',
+    'rest_framework_simplejwt',
+
+    'drf_spectacular',
     'corsheaders',
-    'api'
+
+    'api', 
+    'authentication'
 ]
 
 MIDDLEWARE = [
@@ -41,8 +49,57 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+#Jazzmin settings
+JAZZMIN_SETTINGS = {
+    "site_title": "Octo-travel Admin",
+    "site_header": "Octo-travel",
+    "site_brand": "Octo-travel",
+    "site_logo": None,
+    "welcome_sign": "Welcome to Octo-travel Management",
+    "copyright": "Octo-travel",
+
+    "search_model": [
+        "authentication.User",
+    ],
+
+    "topmenu_links": [
+        {"name": "API Docs", "url": "/api/docs/", "new_window": True},
+        {"model": "auth.User"},
+    ],
+
+    "show_ui_builder": True,
+    "navigation_expanded": True,
+
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "authentication.user": "fas fa-user-astronaut",
+        "api": "fas fa-code",
+    },
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-dark",
+    "accent": "accent-primary",
+    "navbar": "navbar-dark",
+    "no_navbar_border": False,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "theme": "default",
+    "dark_mode_theme": "darkly",
+}
+
 #URL Config
 ROOT_URLCONF = 'config.urls'
+
+#Models
+AUTH_USER_MODEL = "authentication.User"
 
 #Templates
 TEMPLATES = [
@@ -101,6 +158,30 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+#Rest frame work and swagger docs
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "config.renderers.EnvelopeJSONRenderer",
+    ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "config.exception_handlers.custom_exception_handler",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Octo-travel API",
+    "DESCRIPTION": "API documentation for Octo-travel.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+    },
+}
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'

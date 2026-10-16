@@ -6,7 +6,11 @@ dependencies = [
     "dj-database-url>=3.1.2",
     "django>=6.1.2",
     "django-cors-headers>=4.9.0",
+    "django-jazzmin>=3.0.5",
     "djangorestframework>=3.18.3",
+    "djangorestframework-simplejwt>=5.5.1",
     "dotenv>=0.9.9",
+    "drf-spectacular>=0.30.0",
+    "pillow>=12.3.0",
     "psycopg[binary]>=3.3.6",
 ]
