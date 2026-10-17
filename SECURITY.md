@@ -24,7 +24,7 @@ Do not disclose security vulnerabilities through public issues, pull requests, d
 Report vulnerabilities through one of the following private channels:
 
 - GitHub private vulnerability reporting, if enabled for this repository.
-- Email: ayushyush100@gmail.com / [SECONDARY_PERSONEL_EMAIL]
+- Email: ayushyush100@gmail.com / ayushbarun69@gmail.com
 
 Include the following information when possible:
 
@@ -81,6 +81,6 @@ This policy covers security issues affecting the product's source code, applicat
 
 ## 8. Contact
 
-Security contact: ayushyush100@gmail.com / [SECONDARY_PERSONEL_EMAIL]
+Security contact: ayushyush100@gmail.com / ayushbarun69@gmail.com
 
 Last updated: 2026-10-17
