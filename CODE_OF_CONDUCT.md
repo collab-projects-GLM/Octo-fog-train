@@ -39,7 +39,7 @@ Any additional confidentiality or intellectual-property obligations must be esta
 
 Report violations privately to the project maintainers or the designated contact.
 
-Contact: ayushyush100@gmail.com / [SECONDARY_PERSONEL_EMAIL]
+Contact: ayushyush100@gmail.com / ayushbarun69@gmail.com
 
 Reports will be reviewed fairly and handled as confidentially as reasonably possible.
 

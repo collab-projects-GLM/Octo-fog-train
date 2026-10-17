@@ -126,4 +126,4 @@ Follow the project's deployment procedures and ensure relevant checks pass befor
 
 For questions about contributing, contact:
 
-ayushyush100@gmail.com / [SECONDARY_PERSONEL_EMAIL]
+ayushyush100@gmail.com / ayushbarun69@gmail.com
