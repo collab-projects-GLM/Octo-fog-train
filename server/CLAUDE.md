@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Django 6 + DRF API. Needs `.env` copied from `.env.example` first; settings read `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD` at import time, and Docker Compose reads the same file.
+Django 6 + DRF API. Needs `.env` copied from `.env.example` first; settings read `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD` at import time, and Docker Compose reads the same file. `.env` is the local (docker) environment; production lives in the gitignored `.env.prod` (see Environments).
 
 ## Commands
 
@@ -20,6 +20,17 @@ uv run manage.py test config.tests.ErrorEnvelopeTests.test_app_exception_uses_it
 ```
 
 Tests in `config/` use `SimpleTestCase` and run without Postgres. Tests in `authentication/` hit the DB and need the compose Postgres up (Django creates and drops its own test database). After pulling auth changes, run `uv run manage.py migrate` so the dev database gets the `token_blacklist` tables.
+
+## Environments
+
+`APP_ENV` (`local` by default, or `prod`) picks the env file `config/settings.py` loads: `.env` or `.env.prod`. Plain `uv run manage.py ...` is therefore always local. To run against prod, use the wrapper, which asks you to type `prod` first and refuses `test` (it would create a test database on the production Neon server):
+
+```bash
+./scripts/dj.sh local runserver
+./scripts/dj.sh prod migrate
+```
+
+`.env.prod` holds `DATABASE_URL` (Neon; wins over `POSTGRES_*` when set), the Backblaze B2 `S3_*` values, `DJANGO_DEBUG=False` and the Vercel host. On Vercel there is no `.env.prod`; set the same variables in the project settings. Static files are served by WhiteNoise (`WHITENOISE_USE_FINDERS`), so the deploy needs no `collectstatic` step.
 
 ## API response contract
 

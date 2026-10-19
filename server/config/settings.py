@@ -1,10 +1,19 @@
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 import dj_database_url
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+
+# APP_ENV picks which env file is loaded: "local" (default, docker) reads .env,
+# "prod" reads .env.prod. Use scripts/dj.sh to run manage.py against prod behind a
+# confirmation prompt. On a deploy host neither file exists and the real env vars apply.
+APP_ENV = os.getenv("APP_ENV", "local")
+ENV_FILES = {"local": ".env", "prod": ".env.prod"}
+if APP_ENV not in ENV_FILES:
+    raise ImproperlyConfigured(f"APP_ENV must be one of {sorted(ENV_FILES)}, got {APP_ENV!r}")
+load_dotenv(BASE_DIR / ENV_FILES[APP_ENV])
 
 SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
@@ -67,7 +76,7 @@ JAZZMIN_SETTINGS = {
 
     "topmenu_links": [
         {"name": "API Docs", "url": "/api/docs/", "new_window": True},
-        {"model": "auth.User"},
+        {"model": "authentication.User"},
     ],
 
     "show_ui_builder": True,
