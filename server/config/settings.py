@@ -1,5 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -41,6 +42,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -102,6 +104,21 @@ ROOT_URLCONF = 'config.urls'
 #Models
 AUTH_USER_MODEL = "authentication.User"
 
+#S3 setup
+STORAGES = {
+    "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+AWS_S3_ENDPOINT_URL = os.environ["S3_ENDPOINT_URL"]
+AWS_ACCESS_KEY_ID = os.environ["S3_ACCESS_KEY"]
+AWS_SECRET_ACCESS_KEY = os.environ["S3_SECRET_KEY"]
+AWS_STORAGE_BUCKET_NAME = os.environ["S3_BUCKET_NAME"]
+AWS_S3_REGION_NAME = os.environ["S3_REGION"]
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_QUERYSTRING_AUTH = True   # signed URLs for a private bucket
+AWS_DEFAULT_ACL = None        # B2 doesn't support per-object ACLs
+
 #Templates
 TEMPLATES = [
     {
@@ -131,17 +148,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "octo_travel"),
-        "USER": os.getenv("POSTGRES_USER", "octo"),
-        "PASSWORD": os.environ["POSTGRES_PASSWORD"],
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
+# DATABASE_URL (e.g. Neon) wins when set; otherwise fall back to POSTGRES_* (docker compose).
+# sslmode comes from the URL query string. Neon's pooler is PgBouncer in transaction mode,
+# which can't hold server-side cursors, hence disable_server_side_cursors.
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            conn_max_age=60,
+            conn_health_checks=True,
+            disable_server_side_cursors=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "octo_travel"),
+            "USER": os.getenv("POSTGRES_USER", "octo"),
+            "PASSWORD": os.environ["POSTGRES_PASSWORD"],
+            "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": 60,
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -218,6 +247,12 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
+
+# Serverless hosts (Vercel) have no web server in front of Django, and Django only serves
+# /static/ itself when DEBUG=True. WhiteNoise serves it from inside the app; USE_FINDERS makes
+# it read admin/Jazzmin assets straight from the installed packages, so no collectstatic
+# build step (and no STATIC_ROOT) is needed. Trade-off: no compression or cache-busting hashes.
+WHITENOISE_USE_FINDERS = True
 
 
 # Email
