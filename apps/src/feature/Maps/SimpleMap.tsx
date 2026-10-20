@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
 
 export default function MapViewComponent() {
   return (
-    <View className="flex-1">
+    <View className="w-full flex-1">
       <MapView style={styles.map} />
     </View>
   );
