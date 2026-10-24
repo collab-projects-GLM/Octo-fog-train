@@ -34,7 +34,14 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@rnmapbox/maps",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Octo Travel uses your location to place your character on the map."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
