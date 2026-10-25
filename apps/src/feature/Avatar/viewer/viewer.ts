@@ -4,8 +4,8 @@
  * `viewer-html.generated.ts`, which `VrmView` hands to react-native-webview. Inside the
  * WebView it is a normal browser page, so `loadVRM` runs unchanged.
  *
- * React Native sends the model as base64 chunks (`__vrmBegin` → `__vrmChunk`… → `__vrmEnd`),
- * because the WebView can't `fetch` a `file://` asset.
+ * React Native drives it with `window.__vrmReceive(command)` (see `protocol.ts`), including the
+ * model itself as base64 chunks, because the WebView can't `fetch` a `file://` asset.
  */
 import {
   channel,
@@ -20,25 +20,17 @@ import {
 } from "@fanoalone/vrm-controller";
 import { VRMUtils } from "@pixiv/three-vrm";
 import * as THREE from "three";
-import type { ViewerMessage } from "./protocol";
+import { approachAngle } from "./angles";
+import type { HostCommand, ViewerMessage, VrmFit } from "./protocol";
+import { errorMessage, FRAME_PADDING } from "./shared";
 
 declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (data: string) => void };
-    __vrmBegin: (totalChunks: number) => void;
-    __vrmChunk: (base64: string) => void;
-    __vrmEnd: () => void;
-    /** Face `yaw` radians (0 faces the camera, π shows the back) and walk or stand idle. */
-    __vrmSetPose: (yaw: number, moving: boolean) => void;
-    /** "body" fits the whole T-pose width; "height" fits the height only (the map puck). */
-    __vrmSetFit: (fit: "body" | "height") => void;
-    /** Stop drawing frames (the map puck hides the avatar when it is too small to see). */
-    __vrmSetPaused: (paused: boolean) => void;
+    __vrmReceive: (command: HostCommand) => void;
   }
 }
 
-/** Space around the model, as a multiple of its fitted size. */
-const FRAME_PADDING = 1.1;
 /** Cap for phones with 3x+ screens; the avatar doesn't need more. */
 const MAX_PIXEL_RATIO = 2;
 /** How fast the avatar turns toward its heading, per second. */
@@ -52,13 +44,9 @@ function post(message: ViewerMessage) {
   window.ReactNativeWebView?.postMessage(JSON.stringify(message));
 }
 
-function describe(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 window.addEventListener("error", (event) => post({ type: "error", message: event.message }));
 window.addEventListener("unhandledrejection", (event) =>
-  post({ type: "error", message: describe(event.reason) }),
+  post({ type: "error", message: errorMessage(event.reason) }),
 );
 
 const scene = new THREE.Scene();
@@ -76,7 +64,7 @@ try {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
   document.body.appendChild(renderer.domElement);
 } catch (error) {
-  post({ type: "error", message: `WebGL unavailable: ${describe(error)}` });
+  post({ type: "error", message: `WebGL unavailable: ${errorMessage(error)}` });
 }
 
 let avatar: VRMAvatar | null = null;
@@ -88,7 +76,7 @@ let avatar: VRMAvatar | null = null;
 const pivot = new THREE.Group();
 scene.add(pivot);
 
-let fit: "body" | "height" = "body";
+let fit: VrmFit = "body";
 
 /** Point the camera at the avatar so the whole body fits the viewport. */
 function frameAvatar() {
@@ -134,13 +122,6 @@ let targetYaw = 0;
 let yaw = targetYaw;
 /** 0 = standing idle, 1 = walking; the walk layer reads it and eases between the two. */
 let walkTarget = 0;
-
-/** Turn `current` toward `target` the short way round. */
-function approachAngle(current: number, target: number, rate: number, delta: number) {
-  const full = Math.PI * 2;
-  const diff = ((((target - current + Math.PI) % full) + full) % full) - Math.PI;
-  return current + diff * Math.min(1, rate * delta);
-}
 
 /** Idle (breathing, sway), arms lowered, and a gait cycle that fades in with `walkTarget`. */
 function createAvatarAnimator(vrm: VRMAvatar["vrm"]) {
@@ -210,9 +191,9 @@ async function show(model: Blob) {
     frameAvatar();
     const animator = createAvatarAnimator(loaded.vrm);
     loaded.registerUpdate((delta) => animator.update(delta));
-    post({ type: "loaded", metaVersion: loaded.vrm.meta.metaVersion });
+    post({ type: "loaded" });
   } catch (error) {
-    post({ type: "error", message: describe(error) });
+    post({ type: "error", message: errorMessage(error) });
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -221,19 +202,14 @@ async function show(model: Blob) {
 let chunks: Uint8Array<ArrayBuffer>[] = [];
 let expectedChunks = 0;
 
-window.__vrmBegin = (totalChunks) => {
-  chunks = [];
-  expectedChunks = totalChunks;
-};
-
-window.__vrmChunk = (base64) => {
+function addChunk(base64: string) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   chunks.push(bytes);
-};
+}
 
-window.__vrmEnd = () => {
+function endTransfer() {
   if (chunks.length !== expectedChunks) {
     post({
       type: "error",
@@ -244,19 +220,9 @@ window.__vrmEnd = () => {
   const model = new Blob(chunks, { type: "model/gltf-binary" });
   chunks = [];
   void show(model);
-};
+}
 
-window.__vrmSetPose = (yawRadians, moving) => {
-  targetYaw = yawRadians;
-  walkTarget = moving ? 1 : 0;
-};
-
-window.__vrmSetFit = (mode) => {
-  fit = mode;
-  frameAvatar();
-};
-
-window.__vrmSetPaused = (value) => {
+function setPaused(value: boolean) {
   paused = value;
   if (paused) {
     if (frameId !== null) cancelAnimationFrame(frameId);
@@ -265,6 +231,32 @@ window.__vrmSetPaused = (value) => {
     // Don't count the time spent paused as one long frame.
     lastFrame = performance.now();
     schedule();
+  }
+}
+
+window.__vrmReceive = (command) => {
+  switch (command.type) {
+    case "begin":
+      chunks = [];
+      expectedChunks = command.total;
+      break;
+    case "chunk":
+      addChunk(command.data);
+      break;
+    case "end":
+      endTransfer();
+      break;
+    case "pose":
+      targetYaw = command.yaw;
+      walkTarget = command.moving ? 1 : 0;
+      break;
+    case "fit":
+      fit = command.fit;
+      frameAvatar();
+      break;
+    case "paused":
+      setPaused(command.paused);
+      break;
   }
 };
 

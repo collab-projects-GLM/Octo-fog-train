@@ -5,7 +5,7 @@ import {
   Mountain,
   type LucideIcon,
 } from "lucide-react-native";
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -59,10 +59,10 @@ function ControlIcon({ as }: { as: LucideIcon }) {
  * @abstract Floating controls for the map: recenter on the user, flip between the tilted 3D view
  * and a top-down one, switch between the close-up avatar view and an everyday zoomed-out map,
  * and turn the 3D terrain and 3D buildings on or off. Position them inside a container that
- * already stops above the system navigation bar (see SimpleMap).
+ * already stops above the system navigation bar (see Map).
  * @returns JSX
  */
-export default function MapControls({
+function MapControls({
   following,
   tilted,
   terrain,
@@ -110,3 +110,5 @@ export default function MapControls({
     </View>
   );
 }
+
+export default memo(MapControls);

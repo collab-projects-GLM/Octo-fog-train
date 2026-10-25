@@ -12,6 +12,8 @@ module.exports = {
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         error: 'hsl(var(--error))',
+        water: 'hsl(var(--water))',
+        greenspace: 'hsl(var(--greenspace))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {

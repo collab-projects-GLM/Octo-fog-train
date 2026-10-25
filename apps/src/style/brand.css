@@ -20,6 +20,9 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 63%;
+    /* Map ground colors: no UI element has them, so they are not part of the neutral set above. */
+    --water: 205 55% 82%;
+    --greenspace: 130 25% 86%;
     --radius: 0.625rem;
   }
 
@@ -45,5 +48,7 @@
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
+    --water: 210 35% 24%;
+    --greenspace: 140 18% 20%;
   }
 }

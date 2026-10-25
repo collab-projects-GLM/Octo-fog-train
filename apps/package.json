@@ -82,7 +82,8 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
     "three": "^0.184.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   },
   "scripts": {
     "start": "expo start",
@@ -93,7 +94,10 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "build:test": "bunx eas-cli build --profile development --platform android",
-    "build:viewer": "node scripts/build-vrm-viewer.js"
+    "build:viewer": "node scripts/build-vrm-viewer.js",
+    "build:palette": "node scripts/build-palette.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "private": true
 }

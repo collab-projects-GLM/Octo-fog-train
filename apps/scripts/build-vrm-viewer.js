@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Bundles the WebView VRM viewer (src/feature/test/viewer/viewer.ts) into a single HTML
+ * Bundles the WebView VRM viewer (src/feature/Avatar/viewer/viewer.ts) into a single HTML
  * string, written to viewer-html.generated.ts. Run it with `bun run build:viewer` after
  * changing viewer.ts or upgrading three / @pixiv/three-vrm / @fanoalone/vrm-controller.
  */
@@ -10,7 +10,7 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const viewerDir = path.join(__dirname, "..", "src", "feature", "test", "viewer");
+const viewerDir = path.join(__dirname, "..", "src", "feature", "Avatar", "viewer");
 const entry = path.join(viewerDir, "viewer.ts");
 const output = path.join(viewerDir, "viewer-html.generated.ts");
 

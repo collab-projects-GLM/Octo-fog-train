@@ -1,3 +1,5 @@
+import { degToRad } from "@/lib/geo";
+
 /**
  * How tall the avatar stands in the world, in metres. This is the one place to change it: later
  * it can come from the user's own height setting instead of a constant.
@@ -10,10 +12,20 @@ export const AVATAR_HEIGHT_M = 1.7;
  */
 const METERS_PER_DP_AT_ZOOM_0 = 78271.517;
 
-/** Below this on-screen height (dp) the avatar is hidden: it's a speck, the marker says it all. */
-export const AVATAR_FADE_START_DP = 8;
+/** At or below this on-screen height (dp) the avatar is hidden: a speck, the marker says it all. */
+const FADE_START_DP = 8;
 /** At this on-screen height (dp) and above the avatar is fully visible. */
-export const AVATAR_FADE_END_DP = 14;
+const FADE_END_DP = 14;
+
+/**
+ * How visible the avatar should be at an on-screen height: 0 (hidden, so the viewer can stop
+ * drawing) up to 1, ramping linearly between the two thresholds. The one definition of
+ * "visible": opacity, pausing the viewer and the marker's pulse all read it.
+ */
+export function avatarVisibility(heightDp: number): number {
+  const ramp = (heightDp - FADE_START_DP) / (FADE_END_DP - FADE_START_DP);
+  return Math.min(1, Math.max(0, ramp));
+}
 
 /** Mapbox looks through a 36.87° vertical field of view, so tan(fov / 2) is 1/3. */
 const HALF_FOV_TAN = 1 / 3;
@@ -50,10 +62,9 @@ export function avatarScreenHeight({
   y,
   viewHeight,
 }: AvatarScaleInput): number {
-  const pitchRad = (pitch * Math.PI) / 180;
+  const pitchRad = degToRad(pitch);
   const metersPerDp =
-    (METERS_PER_DP_AT_ZOOM_0 * Math.cos((latitude * Math.PI) / 180)) /
-    2 ** zoom;
+    (METERS_PER_DP_AT_ZOOM_0 * Math.cos(degToRad(latitude))) / 2 ** zoom;
 
   let perspective = 1;
   if (viewHeight > 0) {

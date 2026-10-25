@@ -1,5 +1,9 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
+const { buildPalette } = require('./scripts/build-palette');
+
+// Keep src/style/palette.generated.ts in step with src/style/brand.css.
+buildPalette();
 
 const config = getDefaultConfig(__dirname);
 

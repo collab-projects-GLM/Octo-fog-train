@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import * as Location from "expo-location";
-
-type LngLat = [number, number];
+import { useEffect, useState } from "react";
+import { toLngLat, type LngLat } from "@/lib/geo";
 
 /**
  * Reads the last known GPS fix once `enabled` (location permission granted) and returns it as
@@ -22,9 +21,7 @@ export function useStartCenter(enabled: boolean): LngLat | null {
           (await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           }));
-        if (!cancelled) {
-          setCenter([position.coords.longitude, position.coords.latitude]);
-        }
+        if (!cancelled) setCenter(toLngLat(position.coords));
       } catch {
         // Location services off or no fix: the camera keeps its default start.
       }
