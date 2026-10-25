@@ -4,8 +4,9 @@ import { View } from "react-native";
 
 export default function Home() {
   return (
-    <View className="flex-1 items-center justify-center bg-white p-6">
+    <View className="flex-1 bg-white">
       {/* <Login /> */}
+      {/* <Test /> */}
       <Maps />
     </View>
   );
