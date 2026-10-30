@@ -13,10 +13,11 @@ bun install
 bun run android          # needs an emulator/device
 bun run lint             # expo lint
 bunx tsc --noEmit        # typecheck (run lint + typecheck before calling a task done)
+bun run test             # vitest, once (`bun run test:watch` to watch)
 bunx expo install <pkg>  # always use this to add deps, never `bun add`
 ```
 
-There is no test runner configured.
+Tests live in `tests/` (mirrors `src/`, files named `*.test.ts`) and run in a plain Node environment, so they cover pure logic only: keep it in modules that don't import `react-native` (e.g. `src/lib/`, `src/feature/Maps/avatar-scale.ts`). `@` resolves to `src/` (`vitest.config.mts`).
 
 The backend URL comes from `EXPO_PUBLIC_API_URL` (committed default in `.env`, override in the gitignored `.env.local`). Expo inlines it at build time, so it must be read as the static `process.env.EXPO_PUBLIC_API_URL`. For an emulator or USB device, run `adb reverse tcp:8000 tcp:8000` so `localhost:8000` reaches the host.
 
@@ -31,6 +32,10 @@ The envelope shape is defined in the root `CLAUDE.md`. Route every server call t
 - Paths need Django's trailing slash (`/api/auth/login/`). Paths live in `src/lib/api-routes.ts`. Auth headers are passed per call via `headers`; the client does not inject the access token itself.
 - **401 handling.** A 401 from any non-auth path triggers one refresh (`POST /api/auth/token/refresh/` with the refresh token from `expo-secure-store`), saves the rotated `{access, refresh}` pair, and retries the request once with `Authorization: Bearer <new access>`. Concurrent 401s share one refresh, because a rotated refresh token is single-use. If the refresh fails (or no refresh token is stored) it only `console.log`s for now and rethrows the original 401 `ApiError`. Login, register, logout and refresh are never refreshed on 401, so their errors stay real answers. Secure-store keys are in `src/lib/secure-store.ts`.
 - Envelope types are in `src/types/error.type.ts`.
+
+## Colors
+
+`src/style/brand.css` is the one place colors are defined (shadcn tokens, `:root` and `.dark:root`); `tailwind.config.js` exposes each as a class. `scripts/build-palette.js` turns it into `src/style/palette.generated.ts` (Metro regenerates it on start, or `bun run build:palette`), which feeds everything that can't read CSS variables: the navigation theme (`src/lib/theme.ts`) and the map theme. Never hand-copy a color into JS. To add a color: add `--name` to both CSS blocks, add it to `tailwind.config.js` (a test fails if the two disagree or the generated file is stale), then use it in `MAP_COLORS` (`src/feature/Maps/map-theme.ts`) if the map should show it. `MAP_COLORS` is the table of which NativeWind color each Mapbox Standard color setting takes. The map follows the app's color scheme.
 
 ## Architecture
 

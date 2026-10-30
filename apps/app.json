@@ -17,7 +17,9 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "buildType": "apk",
+      "predictiveBackGestureEnabled": false,
+      "package": "com.fanoalone.apps"
     },
     "web": {
       "output": "static",
@@ -33,11 +35,25 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@rnmapbox/maps",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Octo Travel uses your location to place your character on the map."
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ffeb4a6b-350c-496a-b496-5b241ca25740"
+      }
     }
   }
 }
