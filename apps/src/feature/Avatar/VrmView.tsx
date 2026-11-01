@@ -51,7 +51,7 @@ export default function VrmView({
   fit = "body",
   showStatus = true,
 }: VrmViewProps) {
-  const webView = useRef<WebView>(null);
+  const webView = useRef<WebView<object>>(null);
   const sending = useRef(false);
   const pageReady = useRef(false);
   const loaded = useRef(false);
@@ -157,7 +157,7 @@ export default function VrmView({
 
   return (
     <View className="w-full flex-1">
-      <WebView
+      <WebView<object>
         ref={webView}
         source={SOURCE}
         originWhitelist={["*"]}
